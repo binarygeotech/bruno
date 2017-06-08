@@ -32,7 +32,7 @@ To get started with Bruno I highly recommend my article on
 ## Installation
 
 ```bash
-composer require optimus/bruno ~1.0
+composer require binarygeotech/bruno ~1.0
 ```
 
 ## Usage
