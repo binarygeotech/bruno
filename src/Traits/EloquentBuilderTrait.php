@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Facades\Config;
 
 trait EloquentBuilderTrait
 {
@@ -98,7 +99,9 @@ trait EloquentBuilderTrait
     {
         // $value, $not, $key, $operator
         extract($filter);
-
+        
+        $dbType = Config::get('database.default');
+        
         $table = $queryBuilder->getModel()->getTable();
 
         if ($value === 'null' || $value === '') {
@@ -119,7 +122,18 @@ trait EloquentBuilderTrait
                         'ew' => '%'.$value, // ends with
                         'sw' => $value.'%' // starts with
                     ];
-
+                    
+                    $castToText = 'TEXT';
+                    $clauseOperator = $not ? 'NOT LIKE' : 'LIKE';
+ 
+                    if ($dbType === 'postgres') {
+                        $clauseOperator = $not ? 'NOT ILIKE' : 'ILIKE';
+                    }
+ 
+                    if ($dbType === 'mysql') {
+                        $castToText = 'CHAR';
+                    }
+ 
                     $databaseField = DB::raw(sprintf('CAST(%s.%s AS TEXT)', $table, $key));
                     $clauseOperator = $not ? 'NOT ILIKE' : 'ILIKE';
                     $value = $valueString[$operator];
@@ -131,8 +145,14 @@ trait EloquentBuilderTrait
                 case 'gt':
                     $clauseOperator = $not ? '<' : '>';
                     break;
+                case 'gte':
+                    $clauseOperator = $not ? '<' : '>=';
+                    break;
                 case 'lt':
                     $clauseOperator = $not ? '>' : '<';
+                    break;
+                case 'lte':
+                    $clauseOperator = $not ? '>' : '<=';
                     break;
                 case 'in':
                     if ($or === true) {
@@ -244,7 +264,7 @@ trait EloquentBuilderTrait
             if ($relation instanceof BelongsTo) {
                 $query->join(
                     $relation->getRelated()->getTable(),
-                    $model->getTable().'.'.$relation->getForeignKey(),
+                    $model->getTable().'.'.$relation->getQualifiedForeignKeyName(),
                     '=',
                     $relation->getRelated()->getTable().'.'.$relation->getOtherKey(),
                     $type
@@ -254,7 +274,7 @@ trait EloquentBuilderTrait
                     $relation->getTable(),
                     $relation->getQualifiedParentKeyName(),
                     '=',
-                    $relation->getForeignKey(),
+                    $relation->getQualifiedForeignKeyName(),
                     $type
                 );
                 $query->join(
@@ -269,7 +289,7 @@ trait EloquentBuilderTrait
                     $relation->getRelated()->getTable(),
                     $relation->getQualifiedParentKeyName(),
                     '=',
-                    $relation->getForeignKey(),
+                    $relation->getQualifiedForeignKeyName(),
                     $type
                 );
             }
